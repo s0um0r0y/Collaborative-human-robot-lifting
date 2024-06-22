@@ -75,16 +75,18 @@ camera_params = setup_camera()
 # Function to move UR5 using inverse kinematics
 def move_ur5_to_position(ur5Id, target_position, target_orientation):
     joint_positions = p.calculateInverseKinematics(ur5Id, 6, target_position, targetOrientation=target_orientation)
-    for i in range(6):
-        p.setJointMotorControl2(ur5Id, i, p.POSITION_CONTROL, joint_positions[i])
+    print(f"Moving UR5 {ur5Id} to position {target_position} with joint positions {joint_positions}")
+    for i in range(len(joint_positions)):
+        p.setJointMotorControl2(ur5Id, i, p.POSITION_CONTROL, targetPosition=joint_positions[i])
 
 # Move both UR5 robots to the block
 def move_robots_to_block():
     # Define the block position and orientation
-    block_position = [0.5, 0, 0.1]
+    block_position = [0.5, 0, 0]
     block_orientation = p.getQuaternionFromEuler([0, 0, 0])
     
     # Move the first UR5 robot to the block position
+    print("moving ur5")
     move_ur5_to_position(ur5Id1, block_position, block_orientation)
     
     # Adjust the block position for the second robot to grasp from a different side
@@ -99,13 +101,8 @@ def lift_block_together():
     target_orientation_lift = p.getQuaternionFromEuler([0, 0, 0])
     for _ in range(240):
         # Lift the UR5 end-effectors
-        joint_positions1 = p.calculateInverseKinematics(ur5Id1, 6, target_position_lift, target_orientation_lift)
-        for i in range(6):
-            p.setJointMotorControl2(ur5Id1, i, p.POSITION_CONTROL, joint_positions1[i])
-        
-        joint_positions2 = p.calculateInverseKinematics(ur5Id2, 6, [0.5, 0.1, 0.3], target_orientation_lift)
-        for i in range(6):
-            p.setJointMotorControl2(ur5Id2, i, p.POSITION_CONTROL, joint_positions2[i])
+        move_ur5_to_position(ur5Id1, target_position_lift, target_orientation_lift)
+        move_ur5_to_position(ur5Id2, [0.5, 0.1, 0.3], target_orientation_lift)
         
         p.stepSimulation()
         time.sleep(1. / 240.)
@@ -123,11 +120,11 @@ for _ in range(240):
     if cv2.waitKey(1) & 0xFF == ord('q'):
         break
 
-# Move both UR5 robots to the block
-move_robots_to_block()
+    # Move both UR5 robots to the block
+    move_robots_to_block()
 
-# Simulate the collaborative lifting task
-lift_block_together()
+    # Simulate the collaborative lifting task
+    lift_block_together()
 
 p.disconnect()
 cv2.destroyAllWindows()
