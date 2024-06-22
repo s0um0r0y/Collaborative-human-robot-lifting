@@ -11,11 +11,11 @@ p.connect(p.GUI)
 # Set the search path to find URDF files
 p.setAdditionalSearchPath(pybullet_data.getDataPath())
 
-# Define the path to the URDF files
-urdf_root_path = "/home/soumoroy/catkin_ws/src/surge_work/pybullet_ur5_robotiq/urdf/"
-
 # Load the plane
 planeId = p.loadURDF("plane.urdf")
+
+# Define the path to the URDF files
+urdf_root_path = "/home/soumoroy/catkin_ws/src/surge_work/pybullet_ur5_robotiq/urdf/"
 
 # Load the first UR5 robot
 ur5_urdf_path = os.path.join(urdf_root_path, "ur5_robotiq_85.urdf")
@@ -65,7 +65,9 @@ def capture_image(camera_params):
         viewMatrix=camera_params["view_matrix"],
         projectionMatrix=camera_params["projection_matrix"]
     )
-    return rgbImg, depthImg, segImg
+    rgbImg = np.reshape(rgbImg, (height, width, 4))
+    rgbImg = rgbImg[:, :, :3]
+    return rgbImg
 
 # Setup the camera
 camera_params = setup_camera()
@@ -93,13 +95,17 @@ def move_robots_to_block():
 
 # Lift the block together
 def lift_block_together():
+    target_position_lift = [0.5, 0, 0.3]
+    target_orientation_lift = p.getQuaternionFromEuler([0, 0, 0])
     for _ in range(240):
         # Lift the UR5 end-effectors
-        target_position_lift = [0.5, 0, 0.3]
-        move_ur5_to_position(ur5Id1, target_position_lift, p.getQuaternionFromEuler([0, 0, 0]))
+        joint_positions1 = p.calculateInverseKinematics(ur5Id1, 6, target_position_lift, target_orientation_lift)
+        for i in range(6):
+            p.setJointMotorControl2(ur5Id1, i, p.POSITION_CONTROL, joint_positions1[i])
         
-        target_position_lift_second = [0.5, 0.1, 0.3]
-        move_ur5_to_position(ur5Id2, target_position_lift_second, p.getQuaternionFromEuler([0, 0, 0]))
+        joint_positions2 = p.calculateInverseKinematics(ur5Id2, 6, [0.5, 0.1, 0.3], target_orientation_lift)
+        for i in range(6):
+            p.setJointMotorControl2(ur5Id2, i, p.POSITION_CONTROL, joint_positions2[i])
         
         p.stepSimulation()
         time.sleep(1. / 240.)
@@ -110,7 +116,12 @@ for _ in range(240):
     time.sleep(1. / 240.)
 
     # Capture an image from the simulated RealSense camera
-    rgbImg, depthImg, segImg = capture_image(camera_params)
+    rgbImg = capture_image(camera_params)
+    
+    # Display the image using OpenCV
+    cv2.imshow("RealSense Camera Feed", rgbImg)
+    if cv2.waitKey(1) & 0xFF == ord('q'):
+        break
 
 # Move both UR5 robots to the block
 move_robots_to_block()
@@ -119,3 +130,4 @@ move_robots_to_block()
 lift_block_together()
 
 p.disconnect()
+cv2.destroyAllWindows()
